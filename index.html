@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#000000">
+<title>👻 Ghost Projector</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;900&family=Crimson+Text:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html { height: -webkit-fill-available; touch-action: none; }
+
+  :root {
+    --ghost-cyan: #00fff7;
+    --ghost-blue: #0055ff;
+    --ghost-white: #c8f0ff;
+    --ecto-green: #39ff14;
+    --void: #000000;
+  }
+
+  html, body {
+    width: 100%; 
+    height: 100%;
+    min-height: -webkit-fill-available;
+    background: var(--void);
+    overflow: hidden;
+    cursor: none;
+  }
+
+  /* ── IDLE SCREEN ── */
+  #idle-screen {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: #000;
+    z-index: 50;
+    transition: opacity 1.2s ease;
+  }
+  #idle-screen.hidden { opacity: 0; pointer-events: none; }
+
+  .idle-title {
+    font-family: 'Cinzel Decorative', serif;
+    font-size: clamp(2rem, 8vw, 5rem);
+    font-weight: 900;
+    color: var(--ghost-cyan);
+    text-shadow:
+      0 0 20px var(--ghost-cyan),
+      0 0 60px var(--ghost-blue),
+      0 0 120px #003399;
+    letter-spacing: 0.05em;
+    text-align: center;
+    animation: titlePulse 3s ease-in-out infinite;
+  }
+  .idle-sub {
+    font-family: 'Crimson Text', serif;
+    font-style: italic;
+    font-size: clamp(1rem, 3vw, 1.6rem);
+    color: rgba(200, 240, 255, 0.6);
+    margin-top: 1.5rem;
+    letter-spacing: 0.2em;
+    animation: fadeInOut 3s ease-in-out infinite;
+  }
+  .skull { font-size: clamp(3rem, 12vw, 8rem); margin-bottom: 2rem; animation: skullFloat 4s ease-in-out infinite; }
+
+  #start-btn {
+    margin-top: 3rem;
+    font-family: 'Cinzel Decorative', serif;
+    font-size: 1.2rem;
+    color: #000;
+    background: var(--ghost-cyan);
+    border: none;
+    padding: 1.2rem 3.5rem;
+    cursor: pointer;
+    letter-spacing: 0.1em;
+    box-shadow: 0 0 30px var(--ghost-cyan), 0 0 80px var(--ghost-blue);
+    transition: all 0.3s;
+    animation: btnGlow 2s ease-in-out infinite alternate;
+    -webkit-appearance: none;
+    border-radius: 0;
+    min-width: 220px;
+    min-height: 60px;
+    touch-action: manipulation;
+  }
+  #start-btn:hover { background: #fff; box-shadow: 0 0 60px #fff; transform: scale(1.05); }
+
+  /* ── GHOST STAGE ── */
+  #stage {
+    position: fixed; inset: 0;
+    background: var(--void);
+  }
+
+  /* Hidden real video feed */
+  #video {
+    position: absolute;
+    width: 1px; height: 1px;
+    opacity: 0; pointer-events: none;
+  }
+
+  /* Ghost canvas — full screen, centred */
+  #ghost-canvas {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(100vw, 100vh * 0.75);
+    height: min(100vh, 100vw * 1.33);
+  }
+
+  /* Overlay glitch/scan lines */
+  #fx-overlay {
+    position: fixed; inset: 0;
+    pointer-events: none;
+    background:
+      repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 3px,
+        rgba(0,255,247,0.015) 3px,
+        rgba(0,255,247,0.015) 4px
+      );
+    z-index: 10;
+    animation: scanMove 8s linear infinite;
+  }
+
+  /* Floating particles */
+  #particles {
+    position: fixed; inset: 0;
+    pointer-events: none;
+    z-index: 5;
+  }
+  .particle {
+    position: absolute;
+    border-radius: 50%;
+    background: var(--ghost-cyan);
+    box-shadow: 0 0 6px var(--ghost-cyan);
+    animation: particleDrift linear infinite;
+    opacity: 0;
+  }
+
+  /* Countdown flash */
+  #countdown {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-family: 'Cinzel Decorative', serif;
+    font-size: clamp(4rem, 20vw, 12rem);
+    color: var(--ghost-cyan);
+    text-shadow: 0 0 40px var(--ghost-cyan), 0 0 100px var(--ghost-blue);
+    z-index: 30;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s;
+  }
+
+  /* Ghost reveal text */
+  #ghost-label {
+    position: fixed;
+    bottom: 6vh;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Crimson Text', serif;
+    font-style: italic;
+    font-size: clamp(1.2rem, 4vw, 2rem);
+    color: rgba(200,240,255,0.7);
+    text-shadow: 0 0 20px var(--ghost-cyan);
+    letter-spacing: 0.3em;
+    opacity: 0;
+    z-index: 20;
+    white-space: nowrap;
+    animation: none;
+  }
+
+  /* ── KEYFRAMES ── */
+  @keyframes titlePulse {
+    0%,100% { text-shadow: 0 0 20px var(--ghost-cyan), 0 0 60px var(--ghost-blue); opacity:1; }
+    50% { text-shadow: 0 0 40px var(--ghost-cyan), 0 0 120px var(--ghost-blue), 0 0 200px #001166; opacity:0.85; }
+  }
+  @keyframes fadeInOut { 0%,100%{opacity:0.4} 50%{opacity:0.9} }
+  @keyframes skullFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-20px)} }
+  @keyframes btnGlow {
+    from { box-shadow: 0 0 20px var(--ghost-cyan); }
+    to   { box-shadow: 0 0 50px var(--ghost-cyan), 0 0 100px var(--ghost-blue); }
+  }
+  @keyframes scanMove { from{background-position:0 0} to{background-position:0 100px} }
+  @keyframes particleDrift {
+    0%   { transform: translateY(100vh) scale(0); opacity:0; }
+    10%  { opacity: 0.8; }
+    90%  { opacity: 0.4; }
+    100% { transform: translateY(-10vh) scale(1.5); opacity:0; }
+  }
+  @keyframes labelReveal {
+    0%   { opacity:0; letter-spacing:0.6em; }
+    30%  { opacity:0.9; }
+    70%  { opacity:0.9; letter-spacing:0.3em; }
+    100% { opacity:0; }
+  }
+</style>
+</head>
+<body>
+
+<!-- IDLE -->
+<div id="idle-screen">
+  <div class="skull">💀</div>
+  <div class="idle-title">GHOST<br>PROJECTOR</div>
+  <div class="idle-sub">your soul will be revealed</div>
+  <button id="start-btn" onclick="startGhost()">ACTIVATE</button>
+</div>
+
+<!-- STAGE -->
+<div id="stage">
+  <video id="video" autoplay playsinline muted></video>
+  <canvas id="ghost-canvas"></canvas>
+  <div id="fx-overlay"></div>
+  <div id="particles"></div>
+  <div id="countdown"></div>
+  <div id="ghost-label">your spirit walks among us</div>
+  <!-- Fullscreen toggle — tap top-right corner -->
+  <button id="fs-btn" onclick="toggleFullscreen()" style="
+    position:fixed; top:16px; right:16px; z-index:100;
+    background:rgba(0,255,247,0.15); border:1px solid rgba(0,255,247,0.3);
+    color:rgba(0,255,247,0.7); font-size:1.4rem; width:48px; height:48px;
+    border-radius:8px; cursor:pointer; touch-action:manipulation;
+    display:flex; align-items:center; justify-content:center;
+  ">⛶</button>
+</div>
+
+<script>
+const video       = document.getElementById('video');
+const canvas      = document.getElementById('ghost-canvas');
+const ctx         = canvas.getContext('2d');
+const countdown   = document.getElementById('countdown');
+const ghostLabel  = document.getElementById('ghost-label');
+const idleScreen  = document.getElementById('idle-screen');
+
+let captureInterval = null;
+let ghostPhase = 0;       // 0=waiting, 1=capturing, 2=showing
+let lastImageData = null;
+let animFrame = null;
+let showTimer = null;
+let glitchActive = false;
+
+// ── PARTICLES ──
+function spawnParticles() {
+  const container = document.getElementById('particles');
+  for (let i = 0; i < 30; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    const size = Math.random() * 5 + 2;
+    p.style.cssText = `
+      width:${size}px; height:${size}px;
+      left:${Math.random()*100}%;
+      animation-duration:${4 + Math.random()*8}s;
+      animation-delay:${Math.random()*6}s;
+    `;
+    container.appendChild(p);
+  }
+}
+
+// ── START ──
+async function startGhost() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { 
+        facingMode: { ideal: 'environment' },
+        width:  { ideal: 1280 },
+        height: { ideal: 720 }
+      },
+      audio: false
+    });
+    video.srcObject = stream;
+    await video.play();
+  } catch(e) {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      video.srcObject = stream;
+      await video.play();
+    } catch(e2) {
+      alert('Camera access needed! Please allow camera in Chrome settings.');
+      return;
+    }
+  }
+
+  // Go fullscreen on Android
+  try {
+    await document.documentElement.requestFullscreen();
+  } catch(e) {}
+  // Keep screen on (if supported)
+  try {
+    const wakeLock = await navigator.wakeLock.request('screen');
+  } catch(e) {}
+
+  idleScreen.classList.add('hidden');
+  spawnParticles();
+  resizeCanvas();
+  startCaptureLoop();
+  renderLoop();
+}
+
+function toggleFullscreen() {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen().catch(()=>{});
+  } else {
+    document.exitFullscreen().catch(()=>{});
+  }
+}
+
+// ── RESIZE ──
+function resizeCanvas() {
+  canvas.width  = canvas.offsetWidth;
+  canvas.height = canvas.offsetHeight;
+}
+window.addEventListener('resize', resizeCanvas);
+
+// ── CAPTURE LOOP: every 8 seconds ──
+function startCaptureLoop() {
+  captureAndGhostify(); // immediate first capture
+  captureInterval = setInterval(captureAndGhostify, 8000);
+}
+
+async function captureAndGhostify() {
+  // Flash countdown
+  await flashCountdown();
+
+  // Capture frame from video
+  const offscreen = document.createElement('canvas');
+  offscreen.width  = video.videoWidth  || 640;
+  offscreen.height = video.videoHeight || 480;
+  const offCtx = offscreen.getContext('2d');
+  offCtx.drawImage(video, 0, 0);
+
+  // Process into ghost image data
+  lastImageData = ghostifyFrame(offCtx, offscreen.width, offscreen.height);
+  ghostPhase = 2;
+
+  // Show ghost label
+  showGhostLabel();
+}
+
+// ── GHOSTIFY: pixel manipulation ──
+function ghostifyFrame(srcCtx, w, h) {
+  const raw = srcCtx.getImageData(0, 0, w, h);
+  const d   = raw.data;
+
+  // Step 1: desaturate + invert + threshold for silhouette extraction
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i], g = d[i+1], b = d[i+2];
+    // Luminance
+    const lum = 0.299*r + 0.587*g + 0.114*b;
+
+    // Ghost tint: cyan-white spectral glow
+    // Map luminance -> ghostly blue-white
+    const ghost = lum / 255;
+
+    d[i]   = Math.min(255, ghost * 180 + 20);   // R — slight blue cast
+    d[i+1] = Math.min(255, ghost * 230 + 10);   // G — cyan
+    d[i+2] = Math.min(255, ghost * 255 + 40);   // B — full blue
+
+    // Make dark areas transparent (background removal approximation)
+    if (lum < 40) {
+      d[i+3] = 0; // fully transparent
+    } else if (lum < 100) {
+      d[i+3] = Math.floor(((lum - 40) / 60) * 180);
+    } else {
+      d[i+3] = Math.floor(ghost * 210 + 30);
+    }
+  }
+
+  // Create result canvas
+  const result = document.createElement('canvas');
+  result.width = w; result.height = h;
+  const rCtx = result.getContext('2d');
+  rCtx.putImageData(raw, 0, 0);
+
+  // Step 2: Add ethereal glow layers
+  rCtx.globalCompositeOperation = 'screen';
+  rCtx.filter = 'blur(8px)';
+  rCtx.globalAlpha = 0.4;
+  rCtx.putImageData(raw, 0, 0);
+
+  rCtx.filter = 'blur(20px)';
+  rCtx.globalAlpha = 0.2;
+  rCtx.putImageData(raw, 0, 0);
+
+  rCtx.globalCompositeOperation = 'source-over';
+  rCtx.filter = 'none';
+  rCtx.globalAlpha = 1;
+
+  return result;
+}
+
+// ── RENDER LOOP ──
+let tick = 0;
+let ghostAlpha = 0;
+let targetAlpha = 0;
+
+function renderLoop() {
+  tick++;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  if (ghostPhase === 2 && lastImageData) {
+    // Smoothly fade in ghost
+    targetAlpha = 1;
+    ghostAlpha += (targetAlpha - ghostAlpha) * 0.04;
+
+    ctx.save();
+    ctx.globalAlpha = ghostAlpha;
+
+    // Floating animation
+    const floatY = Math.sin(tick * 0.015) * 12;
+    const floatX = Math.sin(tick * 0.009) * 5;
+    const sway   = Math.sin(tick * 0.008) * 0.012;
+
+    const cw = canvas.width;
+    const ch = canvas.height;
+    const iw = lastImageData.width;
+    const ih = lastImageData.height;
+
+    // Fit image to canvas maintaining aspect
+    const scale = Math.min(cw / iw, ch / ih) * 0.85;
+    const dw = iw * scale;
+    const dh = ih * scale;
+    const dx = (cw - dw) / 2 + floatX;
+    const dy = (ch - dh) / 2 + floatY;
+
+    // Ghost glow — draw blurred layers first
+    ctx.filter = 'blur(18px) brightness(1.4)';
+    ctx.globalAlpha = ghostAlpha * 0.35;
+    ctx.drawImage(lastImageData, dx, dy, dw, dh);
+
+    ctx.filter = 'blur(6px) brightness(1.2)';
+    ctx.globalAlpha = ghostAlpha * 0.5;
+    ctx.drawImage(lastImageData, dx, dy, dw, dh);
+
+    // Main ghost — slight sway transform
+    ctx.filter = 'none';
+    ctx.globalAlpha = ghostAlpha * 0.82;
+    ctx.translate(cw/2, ch/2);
+    ctx.rotate(sway);
+    ctx.translate(-cw/2, -ch/2);
+    ctx.drawImage(lastImageData, dx, dy, dw, dh);
+
+    // Glitch effect occasionally
+    if (glitchActive) {
+      const sliceH = Math.random() * 30 + 5;
+      const sliceY = Math.random() * dh + dy;
+      const offsetX = (Math.random() - 0.5) * 40;
+      ctx.drawImage(lastImageData,
+        0, (sliceY - dy) / scale, iw, sliceH / scale,
+        dx + offsetX, sliceY, dw, sliceH
+      );
+    }
+
+    ctx.restore();
+
+    // Ectoplasm drip particles on ghost edge
+    drawEctoParticles(dx, dy, dw, dh);
+
+    // Flicker
+    if (Math.random() < 0.006) triggerGlitch();
+    if (Math.random() < 0.003) triggerFlicker();
+  } else if (ghostPhase === 0) {
+    // Waiting state — draw pulsing orb
+    drawWaitingOrb();
+    ghostAlpha = 0;
+    targetAlpha = 0;
+  }
+
+  animFrame = requestAnimationFrame(renderLoop);
+}
+
+// ── EFFECTS ──
+let ectoParticles = [];
+function drawEctoParticles(x, y, w, h) {
+  // Spawn
+  if (Math.random() < 0.15) {
+    ectoParticles.push({
+      x: x + Math.random() * w,
+      y: y + Math.random() * h * 0.3,
+      vx: (Math.random()-0.5)*0.8,
+      vy: -Math.random()*1.2 - 0.3,
+      life: 1, size: Math.random()*4+1
+    });
+  }
+  // Draw
+  ectoParticles = ectoParticles.filter(p => p.life > 0);
+  for (const p of ectoParticles) {
+    ctx.save();
+    ctx.globalAlpha = p.life * ghostAlpha * 0.7;
+    ctx.fillStyle = `hsl(${180 + Math.random()*30}, 100%, 80%)`;
+    ctx.shadowBlur = 8;
+    ctx.shadowColor = '#00fff7';
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+    p.x += p.vx; p.y += p.vy;
+    p.vy -= 0.02;
+    p.life -= 0.012;
+  }
+}
+
+function drawWaitingOrb() {
+  const cx = canvas.width/2, cy = canvas.height/2;
+  const r = 40 + Math.sin(tick*0.03)*15;
+  const grad = ctx.createRadialGradient(cx,cy,0, cx,cy,r*3);
+  grad.addColorStop(0, `rgba(0,255,247,${0.3 + Math.sin(tick*0.03)*0.1})`);
+  grad.addColorStop(0.4, `rgba(0,85,255,0.15)`);
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r*3, 0, Math.PI*2);
+  ctx.fill();
+}
+
+let glitchTimer = 0;
+function triggerGlitch() {
+  glitchActive = true;
+  glitchTimer = 5;
+  setTimeout(()=>{ glitchActive = false; }, 150);
+}
+
+function triggerFlicker() {
+  let flicks = 0;
+  const f = setInterval(()=>{
+    ghostAlpha *= 0.3;
+    if (++flicks > 3) { clearInterval(f); }
+  }, 60);
+}
+
+// ── COUNTDOWN FLASH ──
+async function flashCountdown() {
+  for (let i = 3; i >= 1; i--) {
+    countdown.textContent = i;
+    countdown.style.opacity = '1';
+    await sleep(500);
+    countdown.style.opacity = '0';
+    await sleep(200);
+  }
+  // Flash "BOO"
+  countdown.textContent = '👻';
+  countdown.style.opacity = '1';
+  countdown.style.fontSize = 'clamp(6rem, 30vw, 18rem)';
+  await sleep(400);
+  countdown.style.opacity = '0';
+  countdown.style.fontSize = '';
+}
+
+function showGhostLabel() {
+  ghostLabel.style.animation = 'none';
+  ghostLabel.offsetHeight; // reflow
+  ghostLabel.style.animation = 'labelReveal 4s ease forwards';
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+</script>
+</body>
+</html>
