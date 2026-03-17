@@ -10,6 +10,11 @@
 <title>👻 Ghost Projector</title>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;900&family=Crimson+Text:ital@0;1&display=swap" rel="stylesheet">
 <style>
+  /* Emergency fallback — ensures text visible even if fonts fail */
+  .idle-title, #start-btn { font-family: 'Cinzel Decorative', Georgia, 'Times New Roman', serif !important; }
+  .idle-sub, #ghost-label { font-family: 'Crimson Text', Georgia, serif !important; }
+</style>
+<style>
   *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html { height: -webkit-fill-available; touch-action: none; }
 
@@ -35,54 +40,57 @@
     position: fixed; inset: 0;
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
-    background: #000;
+    background: #000000;
     z-index: 50;
     transition: opacity 1.2s ease;
   }
   #idle-screen.hidden { opacity: 0; pointer-events: none; }
 
   .idle-title {
-    font-family: 'Cinzel Decorative', serif;
-    font-size: clamp(2rem, 8vw, 5rem);
+    font-size: clamp(3rem, 14vw, 5rem);
     font-weight: 900;
-    color: var(--ghost-cyan);
-    text-shadow:
-      0 0 20px var(--ghost-cyan),
-      0 0 60px var(--ghost-blue),
-      0 0 120px #003399;
+    color: #00fff7;
+    text-shadow: 0 0 30px #00fff7, 0 0 80px #0055ff;
     letter-spacing: 0.05em;
     text-align: center;
+    line-height: 1.1;
     animation: titlePulse 3s ease-in-out infinite;
   }
   .idle-sub {
-    font-family: 'Crimson Text', serif;
     font-style: italic;
-    font-size: clamp(1rem, 3vw, 1.6rem);
-    color: rgba(200, 240, 255, 0.6);
+    font-size: clamp(1.1rem, 4.5vw, 1.6rem);
+    color: #c8f0ff;
     margin-top: 1.5rem;
-    letter-spacing: 0.2em;
+    letter-spacing: 0.15em;
+    text-align: center;
+    padding: 0 2rem;
     animation: fadeInOut 3s ease-in-out infinite;
   }
-  .skull { font-size: clamp(3rem, 12vw, 8rem); margin-bottom: 2rem; animation: skullFloat 4s ease-in-out infinite; }
+  .skull {
+    font-size: clamp(5rem, 20vw, 8rem);
+    margin-bottom: 2rem;
+    animation: skullFloat 4s ease-in-out infinite;
+  }
 
   #start-btn {
     margin-top: 3rem;
-    font-family: 'Cinzel Decorative', serif;
-    font-size: 1.2rem;
-    color: #000;
-    background: var(--ghost-cyan);
+    font-size: 1.3rem;
+    font-weight: 900;
+    color: #000000;
+    background: #00fff7;
     border: none;
-    padding: 1.2rem 3.5rem;
+    padding: 1.4rem 4rem;
     cursor: pointer;
-    letter-spacing: 0.1em;
-    box-shadow: 0 0 30px var(--ghost-cyan), 0 0 80px var(--ghost-blue);
+    letter-spacing: 0.12em;
+    box-shadow: 0 0 40px #00fff7, 0 0 80px #0055ff;
     transition: all 0.3s;
     animation: btnGlow 2s ease-in-out infinite alternate;
     -webkit-appearance: none;
-    border-radius: 0;
-    min-width: 220px;
-    min-height: 60px;
+    border-radius: 4px;
+    min-width: 260px;
+    min-height: 70px;
     touch-action: manipulation;
+    display: block;
   }
   #start-btn:hover { background: #fff; box-shadow: 0 0 60px #fff; transform: scale(1.05); }
 
@@ -308,31 +316,43 @@ function toggleFullscreen() {
 
 // ── RESIZE ──
 function resizeCanvas() {
-  canvas.width  = canvas.offsetWidth;
-  canvas.height = canvas.offsetHeight;
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
 }
 window.addEventListener('resize', resizeCanvas);
 
 // ── CAPTURE LOOP: every 8 seconds ──
 function startCaptureLoop() {
-  captureAndGhostify(); // immediate first capture
-  captureInterval = setInterval(captureAndGhostify, 8000);
+  // Wait until video has actual dimensions before first capture
+  const waitForVideo = setInterval(() => {
+    if (video.videoWidth > 0) {
+      clearInterval(waitForVideo);
+      captureAndGhostify();
+      captureInterval = setInterval(captureAndGhostify, 8000);
+    }
+  }, 200);
 }
 
 async function captureAndGhostify() {
   // Flash countdown
   await flashCountdown();
 
+  const vw = video.videoWidth;
+  const vh = video.videoHeight;
+
+  if (!vw || !vh) return; // video not ready
+
   // Capture frame from video
   const offscreen = document.createElement('canvas');
-  offscreen.width  = video.videoWidth  || 640;
-  offscreen.height = video.videoHeight || 480;
+  offscreen.width  = vw;
+  offscreen.height = vh;
   const offCtx = offscreen.getContext('2d');
-  offCtx.drawImage(video, 0, 0);
+  offCtx.drawImage(video, 0, 0, vw, vh);
 
   // Process into ghost image data
-  lastImageData = ghostifyFrame(offCtx, offscreen.width, offscreen.height);
+  lastImageData = ghostifyFrame(offCtx, vw, vh);
   ghostPhase = 2;
+  ghostAlpha = 0; // reset so it fades in fresh
 
   // Show ghost label
   showGhostLabel();
@@ -343,49 +363,51 @@ function ghostifyFrame(srcCtx, w, h) {
   const raw = srcCtx.getImageData(0, 0, w, h);
   const d   = raw.data;
 
-  // Step 1: desaturate + invert + threshold for silhouette extraction
+  // Tint every pixel ghostly cyan-white, make darks transparent
   for (let i = 0; i < d.length; i += 4) {
     const r = d[i], g = d[i+1], b = d[i+2];
-    // Luminance
     const lum = 0.299*r + 0.587*g + 0.114*b;
-
-    // Ghost tint: cyan-white spectral glow
-    // Map luminance -> ghostly blue-white
     const ghost = lum / 255;
 
-    d[i]   = Math.min(255, ghost * 180 + 20);   // R — slight blue cast
-    d[i+1] = Math.min(255, ghost * 230 + 10);   // G — cyan
-    d[i+2] = Math.min(255, ghost * 255 + 40);   // B — full blue
+    d[i]   = Math.min(255, ghost * 160 + 20);   // R
+    d[i+1] = Math.min(255, ghost * 230 + 15);   // G — cyan tint
+    d[i+2] = Math.min(255, ghost * 255 + 50);   // B — blue-white
 
-    // Make dark areas transparent (background removal approximation)
-    if (lum < 40) {
-      d[i+3] = 0; // fully transparent
-    } else if (lum < 100) {
-      d[i+3] = Math.floor(((lum - 40) / 60) * 180);
+    // Background removal: make dark pixels transparent
+    if (lum < 35) {
+      d[i+3] = 0;
+    } else if (lum < 90) {
+      d[i+3] = Math.floor(((lum - 35) / 55) * 160);
     } else {
-      d[i+3] = Math.floor(ghost * 210 + 30);
+      d[i+3] = Math.floor(ghost * 200 + 55);
     }
   }
 
-  // Create result canvas
+  // Base canvas with ghostified pixels
+  const base = document.createElement('canvas');
+  base.width = w; base.height = h;
+  const bCtx = base.getContext('2d');
+  bCtx.putImageData(raw, 0, 0);
+
+  // Result canvas: base + glow layers using drawImage (filter works here)
   const result = document.createElement('canvas');
   result.width = w; result.height = h;
   const rCtx = result.getContext('2d');
-  rCtx.putImageData(raw, 0, 0);
 
-  // Step 2: Add ethereal glow layers
-  rCtx.globalCompositeOperation = 'screen';
-  rCtx.filter = 'blur(8px)';
-  rCtx.globalAlpha = 0.4;
-  rCtx.putImageData(raw, 0, 0);
+  // Outer glow
+  rCtx.filter = 'blur(18px)';
+  rCtx.globalAlpha = 0.45;
+  rCtx.drawImage(base, 0, 0);
 
-  rCtx.filter = 'blur(20px)';
-  rCtx.globalAlpha = 0.2;
-  rCtx.putImageData(raw, 0, 0);
+  // Mid glow
+  rCtx.filter = 'blur(7px)';
+  rCtx.globalAlpha = 0.55;
+  rCtx.drawImage(base, 0, 0);
 
-  rCtx.globalCompositeOperation = 'source-over';
+  // Sharp base layer
   rCtx.filter = 'none';
-  rCtx.globalAlpha = 1;
+  rCtx.globalAlpha = 0.9;
+  rCtx.drawImage(base, 0, 0);
 
   return result;
 }
