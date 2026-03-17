@@ -232,6 +232,14 @@
     border-radius:8px; cursor:pointer; touch-action:manipulation;
     display:flex; align-items:center; justify-content:center;
   ">⛶</button>
+  <!-- Stop button -->
+  <button onclick="stopGhost()" style="
+    position:fixed; top:16px; left:16px; z-index:100;
+    background:rgba(255,50,50,0.15); border:1px solid rgba(255,50,50,0.3);
+    color:rgba(255,100,100,0.8); font-size:1.1rem; width:48px; height:48px;
+    border-radius:8px; cursor:pointer; touch-action:manipulation;
+    display:flex; align-items:center; justify-content:center;
+  ">■</button>
 </div>
 
 <script>
@@ -312,6 +320,23 @@ function toggleFullscreen() {
   } else {
     document.exitFullscreen().catch(()=>{});
   }
+}
+
+function stopGhost() {
+  // Stop camera
+  if (video.srcObject) {
+    video.srcObject.getTracks().forEach(t => t.stop());
+    video.srcObject = null;
+  }
+  // Stop loops
+  clearInterval(captureInterval);
+  cancelAnimationFrame(animFrame);
+  // Return to idle
+  lastImageData = null;
+  ghostPhase = 0;
+  ghostAlpha = 0;
+  idleScreen.classList.remove('hidden');
+  try { document.exitFullscreen(); } catch(e) {}
 }
 
 // ── RESIZE ──
