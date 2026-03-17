@@ -271,7 +271,7 @@ async function startGhost() {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
       video: { 
-        facingMode: { ideal: 'user' },
+        facingMode: 'user',
         width:  { ideal: 1280 },
         height: { ideal: 720 }
       },
@@ -281,7 +281,7 @@ async function startGhost() {
     await video.play();
   } catch(e) {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
       video.srcObject = stream;
       await video.play();
     } catch(e2) {
